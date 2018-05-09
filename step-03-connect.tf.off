@@ -1,0 +1,96 @@
+# Automate User Setup
+# -- Create Validator keys and download them to local .chef dir
+resource "null_resource" "chef_automate-validator" {
+  depends_on = ["null_resource.bootstrap_chef_server"]
+  connection {
+    host        = "${aws_instance.chef-server.public_ip}"
+    user        = "${var.ssh_username}"
+    private_key = "${file("${var.ssh_key["file"]}")}"
+  }
+  # Create delivery-validator.pem
+  provisioner "remote-exec" {
+    inline = [
+      "[[ -e \".chef/delivery-validator.pem\" ]] && mv \".chef/delivery-validator.pem\" \".chef/delivery-validator.pem.bak.`date +%d%m%Y%H%M%S`\"",
+      "[[ -e \".chef/delivery-validator.pub\" ]] && mv \".chef/delivery-validator.pub\" \".chef/delivery-validator.pub.bak.`date +%d%m%Y%H%M%S`\"",
+      "ssh-keygen -t rsa -N \"\" -f .chef/delivery-validator.pem",
+      "openssl rsa -in .chef/delivery-validator.pem -pubout -out .chef/delivery-validator.pub",
+      "mv -f .chef/delivery-validator.pem /tmp/delivery-validator.pem",
+      "mv -f .chef/delivery-validator.pub /tmp/delivery-validator.pub",
+    ]
+  }
+  provisioner "local-exec" {
+      command = "scp -r -o stricthostkeychecking=no -i ${var.ssh_key["file"]} ${var.ssh_username}@${aws_instance.chef-server.public_ip}:/tmp/delivery-validator.* .chef/"
+  }
+}
+
+# -- Create Delivery user
+resource "null_resource" "chef_automate-user" {
+  depends_on = ["null_resource.chef_automate-validator"]
+  connection {
+    host        = "${aws_instance.chef-server.public_ip}"
+    user        = "${var.ssh_username}"
+    private_key = "${file("${var.ssh_key["file"]}")}"
+  }
+  # Create delivery-validator.pem
+  provisioner "remote-exec" {
+    inline = [
+      "sudo chef-server-ctl user-create delivery Delivery User delivery.user@email.com '${base64sha256(aws_instance.chef-server.id)}' --filename /tmp/delivery.pem",
+    ]
+  }
+  provisioner "local-exec" {
+      command = "scp -r -o stricthostkeychecking=no -i ${var.ssh_key["file"]} ${var.ssh_username}@${aws_instance.chef-server.public_ip}:/tmp/delivery.pem .chef/"
+  }
+}
+
+
+# -- Create Delivery Org
+resource "null_resource" "chef_automate-org" {
+  depends_on = ["null_resource.chef_automate-user"]
+  connection {
+    host        = "${aws_instance.chef-server.public_ip}"
+    user        = "${var.ssh_username}"
+    private_key = "${file("${var.ssh_key["file"]}")}"
+  }
+  # Create delivery-validator.pem
+  provisioner "remote-exec" {
+    inline = [
+      "sudo chef-server-ctl org-create automate 'Org for Chef Automate' --filename /tmp/automate-validator.pem -a delivery",
+    ]
+  }
+  provisioner "local-exec" {
+      command = "scp -r -o stricthostkeychecking=no -i ${var.ssh_key["file"]} ${var.ssh_username}@${aws_instance.chef-server.public_ip}:/tmp/automate-validator.pem .chef/"
+  }
+}
+
+resource "null_resource" "chef_server-automate-config" {
+  depends_on = ["aws_instance.chef-automate", "null_resource.chef_automate-org"]
+  connection {
+    host        = "${aws_instance.chef-server.public_ip}"
+    user        = "${var.ssh_username}"
+    private_key = "${file("${var.ssh_key["file"]}")}"
+  }
+  provisioner "remote-exec" {
+    inline = [
+      "sudo chef-server-ctl set-secret data_collector token '${var.automate_token}'",
+      "sudo chef-server-ctl restart nginx",
+      "sudo chef-server-ctl restart opscode-erchef",
+      "sudo cp /etc/opscode/chef-server.rb ./",
+      "sudo chown centos ./chef-server.rb",
+      "echo \"data_collector['root_url'] = 'https://CHANGEME-CHANGEME.COM/data-collector/v0/'\" >> chef-server.rb",
+      "echo \"profiles['root_url'] = 'https://CHANGEME-CHANGEME.COM'\" >> chef-server.rb",
+      "sudo cp ./chef-server.rb /etc/opscode/chef-server.rb",
+      "sudo chown root ./chef-server.rb",
+      "sudo cp /etc/hosts ./",
+      "sudo chown centos ./hosts",
+      "echo \"${aws_instance.chef-automate.private_ip} CHANGEME-CHANGEME.COM\" >> ./hosts",
+      "sudo cp ./hosts /etc/hosts",
+      "sudo chown root /etc/hosts",
+      "sudo hostname CHANGEME.chef.io",
+      "sudo chef-server-ctl reconfigure",
+      "sudo chef-server-ctl restart"
+    ]
+  }
+  provisioner "local-exec" {
+      command = "scp -r -o stricthostkeychecking=no -i ${var.ssh_key["file"]} ${var.ssh_username}@${aws_instance.chef-server.public_ip}:/tmp/automate-validator.pem .chef/"
+  }
+}

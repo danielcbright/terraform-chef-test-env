@@ -1,0 +1,71 @@
+## AWS Settings
+aws                               = {
+  access_key                      = "AKIAAKIAAKIAAKIAAKIA" #CHANGEME
+  secret_key                      = "GI/4QGI/4QGI/4QGI/4QGI/4QGI/4QGI/4QGI/4Q" #CHANGEME
+  region                          = "us-east-1"
+}
+
+## General Variables
+prefix                            = "CHANGEME"
+default_tags                      = {
+  X-Contact                       = "flast"
+  X-Dept                          = "My Dept."
+}
+
+## Chef Certs/Files/Secrets
+ssl_cert_arn                      = "arn:aws:acm:us-east-1:########:certificate/###############################"
+automate_token                    = "93a49a4f2482c64126f7b6015e6b0f30284287ee4054ff8807fb63d9cbd1c506" # This is the default Automate token, change if you want it to be more secure
+chef_ssl                          = {
+  cert                            = "/Users/user/keys/server.crt"
+  key                             = "/Users/user/keys/privatekey.pem"
+}
+chef_user                         = {
+  email                           = "you@domain.com"
+  first                           = "You"
+  last                            = "You"
+  username                        = "flast"
+}
+# Windows Bastion Host
+windows_pw                        = "CHANGEME"
+
+## Network Settings
+allowed_cidrs                     = "10.10.10.10/32" # Put your home IP here
+chef_networking                   = { # JUST A SUGGESTION/TEST PLEASE CHANGE
+  main_vpc_cidr_block             = "10.12.12.0/24"    # 254 useable IPs
+  chef_01_public_cidr_block       = "10.12.12.0/27"    # 30 useable IPs
+  chef_02_private_cidr_block      = "10.12.12.32/27"   # 30 useable IPs
+  chef_03_private_cidr_block      = "10.12.12.64/27"   # 30 useable IPs
+}
+
+## Chef Server Settings
+chef_addons                       = "manage,push-jobs-server"
+chef_license                      = "true"
+chef_log                          = "true"
+chef_org                          = {
+  short                           = "yourorg"
+  long                            = "YourOrg, Inc."
+}
+chef_versions                     = {
+  client                          = "13.8.3" # Last tested versions
+  server                          = "12.17.33"
+}
+instance                          = {
+  hostname                        = "flast"
+  domain                          = "company.com"
+}
+instance_type                     = "c3.xlarge"
+ssh_key                           = {
+  file                            = "/Users/user/.ssh/id_rsa"
+  name                            = "your-key"
+}
+shared_ssh_key                           = {
+  file                            = "/Users/user/.ssh/shared_rsa"
+  name                            = "shared_rsa_test_key"
+}
+chef_server_pub                   = "true"
+chef_automate_pub                 = "true"
+instance_volume                   = {
+  size                            = "20"
+  type                            = "gp2"
+  delete                          = "true"
+}

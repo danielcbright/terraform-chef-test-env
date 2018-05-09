@@ -1,0 +1,130 @@
+# Create a new instance of the latest Ubuntu 14.04 on an
+# t2.micro node with an AWS Tag naming it "HelloWorld"
+resource "aws_instance" "runner" {
+  count = 2
+  ami           = "ami-e3fdd999"
+  instance_type = "t2.small"
+  connection {
+    bastion_host = "${aws_instance.linux-bastion.public_ip}"
+    host     = "${self.private_ip}"
+    user        = "${var.ssh_username}"
+    private_key = "${file("${var.ssh_key["file"]}")}"
+  }
+  provisioner "remote-exec" {
+    inline = [
+      "cp /etc/hosts ./",
+      "echo \"${aws_instance.chef-server.private_ip} CHANGEME.chef.io\" >> ./hosts",
+      "sudo cp ./hosts /etc/hosts"
+    ]
+  }
+  provisioner "remote-exec" {
+    inline = [
+      "cp /etc/hosts ./",
+      "echo \"${aws_instance.CHANGEME.private_ip} CHANGEME-CHANGEME.com\" >> ./hosts",
+      "sudo cp ./hosts /etc/hosts"
+    ]
+  }
+  # associate_public_ip_address = false
+  subnet_id = "${aws_subnet.chef_02_private.id}"
+
+  key_name = "${aws_key_pair.CHANGEME.id}"
+
+  vpc_security_group_ids = ["${aws_security_group.chef_internal.id}"]
+
+  tags                        = "${merge(var.default_tags, map(
+                                  "Name", "${var.prefix}-runner-${count.index}",
+                                ))}"
+}
+
+resource "null_resource" "generate_runner_rsa" {
+  depends_on = ["aws_instance.CHANGEME","null_resource.chef_server-automate-config"]
+  connection {
+    host        = "${aws_instance.CHANGEME.public_ip}"
+    user        = "${var.ssh_username}"
+    private_key = "${file("${var.ssh_key["file"]}")}"
+  }
+  provisioner "remote-exec" {
+    inline = [
+      "[[ -e \".ssh/runner_rsa\" ]] && mv \".ssh/runner_rsa\" \".ssh/runner_rsa.bak.`date +%d%m%Y%H%M%S`\"",
+      "[[ -e \".ssh/runner_rsa.pub\" ]] && mv \".ssh/runner_rsa.pub\" \".ssh/runner_rsa.pub.bak.`date +%d%m%Y%H%M%S`\"",
+      "ssh-keygen -t rsa -N \"\" -f .ssh/runner_rsa",
+      "chmod 600 .ssh/runner_rsa"
+    ]
+  }
+  provisioner "local-exec" {
+      command = "scp -r -o stricthostkeychecking=no -i ${var.ssh_key["file"]} ${var.ssh_username}@${aws_instance.CHANGEME.public_ip}:.ssh/runner_rsa* .chef/"
+  }
+}
+resource "null_resource" "copy_runner_rsa_pub_0" {
+  depends_on = ["null_resource.generate_runner_rsa","null_resource.chef_server-automate-config"]
+  connection {
+    bastion_host = "${aws_instance.linux-bastion.public_ip}"
+    host     = "${aws_instance.runner.0.private_ip}"
+    user        = "${var.ssh_username}"
+    private_key = "${file("${var.ssh_key["file"]}")}"
+  }
+  provisioner "file" {
+    source         = ".chef/runner_rsa.pub"
+    destination    = "./runner_rsa.pub"
+  }
+  provisioner "remote-exec" {
+    inline = [
+      "cat ./runner_rsa.pub >> .ssh/authorized_keys"
+    ]
+  }
+}
+
+resource "null_resource" "add_runner_0" {
+  depends_on = ["null_resource.copy_runner_rsa_pub_0","null_resource.chef_server-automate-config"]
+  connection {
+    host        = "${aws_instance.CHANGEME.public_ip}"
+    user        = "${var.ssh_username}"
+    private_key = "${file("${var.ssh_key["file"]}")}"
+  }
+  provisioner "remote-exec" {
+    inline = [
+      "cp /etc/hosts ./",
+      "echo \"${aws_instance.runner.0.private_ip} runner-0.chef.io\" >> ./hosts",
+      "sudo cp ./hosts /etc/hosts",
+      "sudo automate-ctl install-runner runner-0.chef.io centos -i ~/.ssh/runner_rsa -y"
+    ]
+  }
+
+}
+
+resource "null_resource" "copy_runner_rsa_pub_1" {
+  depends_on = ["null_resource.generate_runner_rsa","null_resource.chef_server-automate-config"]
+  connection {
+    bastion_host = "${aws_instance.linux-bastion.public_ip}"
+    host     = "${aws_instance.runner.1.private_ip}"
+    user        = "${var.ssh_username}"
+    private_key = "${file("${var.ssh_key["file"]}")}"
+  }
+  provisioner "file" {
+    source         = ".chef/runner_rsa.pub"
+    destination    = "./runner_rsa.pub"
+  }
+  provisioner "remote-exec" {
+    inline = [
+      "cat ./runner_rsa.pub >> .ssh/authorized_keys"
+    ]
+  }
+}
+
+resource "null_resource" "add_runner_1" {
+  depends_on = ["null_resource.copy_runner_rsa_pub_1","null_resource.chef_server-automate-config","null_resource.add_runner_0"]
+  connection {
+    host        = "${aws_instance.CHANGEME.public_ip}"
+    user        = "${var.ssh_username}"
+    private_key = "${file("${var.ssh_key["file"]}")}"
+  }
+  provisioner "remote-exec" {
+    inline = [
+      "cp /etc/hosts ./",
+      "echo \"${aws_instance.runner.1.private_ip} runner-1.chef.io\" >> ./hosts",
+      "sudo cp ./hosts /etc/hosts",
+      "sudo automate-ctl install-runner runner-1.chef.io centos -i ~/.ssh/runner_rsa -y"
+    ]
+  }
+
+}

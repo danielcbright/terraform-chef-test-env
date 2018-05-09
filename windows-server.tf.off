@@ -1,0 +1,46 @@
+# Create a new EC2 instance with Chef as provisioner
+resource "aws_instance" "windows-bastion" {
+  # provisioner "chef" {
+  #   environment               = "_default"
+  #   log_to_file               = "${var.chef_log}"
+  #   node_name                 = "windows-bastion-us-east-1"
+  #   run_list                  = ["recipe[chef-client::default],recipe[chef-client::task],chef-client::delete_validation"]
+  #   server_url                = "https://${var.instance["hostname"]}.${var.instance["domain"]}/organizations/${var.chef_org["short"]}"
+  #   user_name                 = "${var.chef_user["username"]}"
+  #   user_key                  = "${file(".chef/user.pem")}"
+  #   fetch_chef_certificates   = true
+  #   version                   = "${var.chef_versions["client"]}"
+  # }
+  tags                        = "${merge(var.default_tags, map(
+                                  "Name", "${var.prefix}-windows-bastion",
+                                ))}"
+  subnet_id                   = "${aws_subnet.chef_01_public.id}"
+  associate_public_ip_address = true
+  connection {
+    host                      = "${self.public_ip}"
+    type                      = "winrm"
+    user                      = "${var.windows_bastion_user["username"]}"
+    password                  = "${var.windows_bastion_user["password"]}"
+  }
+  instance_type               = "t2.micro"
+  ami                         = "ami-c951acb4"
+  key_name                    = "${aws_key_pair.CHANGEME.id}"
+  vpc_security_group_ids      = ["${aws_security_group.chef_admin.id}","${aws_security_group.chef_internal.id}"]
+  user_data                   = <<EOF
+    <script>
+      winrm quickconfig -q & winrm set winrm/config/winrs @{MaxMemoryPerShellMB="300"} & winrm set winrm/config @{MaxTimeoutms="1800000"} & winrm set winrm/config/service @{AllowUnencrypted="true"} & winrm set winrm/config/service/auth @{Basic="true"}
+    </script>
+    <powershell>
+      netsh advfirewall firewall add rule name="WinRM in" protocol=TCP dir=in profile=any localport=5985 remoteip=any localip=any action=allow
+      $admin = [adsi]("WinNT://./administrator, user")
+      $admin.psbase.invoke("SetPassword", "${var.windows_bastion_user["password"]}")
+      If ((Get-Content "$($env:windir)\system32\Drivers\etc\hosts" ) -notcontains "${aws_instance.chef-server.private_ip} CHANGEME.chef.io")
+      {ac -Encoding UTF8  "$($env:windir)\system32\Drivers\etc\hosts" "${aws_instance.chef-server.private_ip} CHANGEME.chef.io" }
+    </powershell>
+EOF
+}
+
+# Show the public IP address at the end
+output "address" {
+  value = "${aws_instance.windows-bastion.public_ip}"
+}
