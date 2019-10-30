@@ -11,7 +11,30 @@ variable "dynamodb-suffix" {
 }
 
 variable "allowed_cidrs" {
-  type             = "string"
+  type             = "list"
   description      = "A list of allowed CIDRs for SSH"
-  default          = "0.0.0.0/0"
+  default          = ["0.0.0.0/0"]
+}
+
+variable "X-S3-Terraform-Path" {
+  type             = "string"
+  description      = "S3 Bucket + Path for this TFSTATE"
+  default          = "CHANGEME"
+}
+## SSH Keys
+variable "ssh_key" {
+  type             = "map"
+  description      = "EC2 instance SSH key settings"
+  default          = {
+    file           = "/change/path/to/key"
+    name           = "My Super Awesome SSH key"
+  }
+}
+variable "shared_ssh_key" {
+  type             = "map"
+  description      = "EC2 instance SSH key settings"
+  default          = {
+    file           = "/change/path/to/key"
+    name           = "My Super Awesome Shared SSH key"
+  }
 }

@@ -1,69 +1,110 @@
 # Create a basic Centos 7 Bastion Host to route incoming SSH traffic through
-resource "aws_instance" "centos-a" {
-  count = 0
-  # depends_on = ["aws_instance.chef-server"]
+resource "aws_instance" "cache" {
+  count = 1
   connection {
-    user        = "${var.ssh_username}"
+    host        = self.public_ip
+    user        = "centos"
     private_key = "${file("${var.ssh_key["file"]}")}"
   }
   # Provision with Chef
   provisioner "chef" {
-     environment             = "${var.chef_environment}"
-     node_name               = "centos-7-a-${count.index}"
+     node_name               = "cache-${count.index}"
      use_policyfile          = true
      policy_group            = "dev"
-     policy_name             = "dev-role-a"
-     server_url              = "https://chef-server.dbright.io/organizations/${var.chef_org["short"]}"
-     user_name               = "${var.chef_user["username"]}"
+     policy_name             = "lin-web-app-stack"
+     server_url              = "https://chef-server.dbright.io:4443/organizations/dbright"
+     user_name               = "dbright"
      user_key                = "${file(".chef/user.pem")}"
-     version                 = "${var.chef_versions["client"]}"
+     version                 = "15.4.45"
+     client_options          = ["chef_license 'accept'", "named_run_list 'cache'"]
      fetch_chef_certificates = true
      recreate_client         = true
   }
+
+  provisioner "habitat" {
+    peers              = [self.private_ip]
+    use_sudo           = true
+    service_type       = "systemd"
+    accept_license     = true
+    auto_update        = true
+    builder_auth_token = "${var.hab_token}"
+
+    service {
+      name        = "dbright/lin-effortless-audit"
+      topology    = "standalone"
+      user_toml   = file("files/lin-effortless-audit-user.toml")
+      channel     = "stable"
+      group       = "dev"
+      application = "Linux Effortless Baseline"
+      strategy    = "at-once"
+    }
+  }
+
   ami           = "${data.aws_ami.centos.id}"
   instance_type = "t2.small"
   associate_public_ip_address = true
   subnet_id = "${local.subnet_public_00}"
 
-  key_name = "${aws_key_pair.personal.id}"
+  key_name = local.personal-ssh
 
-  vpc_security_group_ids = ["${local.sg_admin}","${local.sg_internal}"]
+  vpc_security_group_ids = [local.sg_admin,local.sg_internal]
 
-  tags = "${merge(data.terraform_remote_state.static.default_tags, map(
-    "Name", "${local.prefix}centos-7-a-${count.index}",
-  ))}"
+  tags  = "${merge(local.tags, map(
+          "Name", "${local.prefix}cache-${count.index}${local.suffix}",
+          ))}"
 }
 
-resource "aws_instance" "centos-b" {
-  count = 0
+resource "aws_instance" "web" {
+  count = 1
   connection {
-    user        = "${var.ssh_username}"
+    host        = self.public_ip
+    user        = "centos"
     private_key = "${file("${var.ssh_key["file"]}")}"
   }
   # Provision with Chef
   provisioner "chef" {
-     environment     = "${var.chef_environment}"
-     node_name               = "centos-7-b-${count.index}"
+     node_name               = "web-${count.index}"
      use_policyfile          = true
      policy_group            = "dev"
-     policy_name             = "dev-role-b" 
-     server_url              = "https://chef-server.dbright.io/organizations/${var.chef_org["short"]}"
-     user_name               = "${var.chef_user["username"]}"
+     policy_name             = "lin-web-app-stack"
+     server_url              = "https://chef-server.dbright.io:4443/organizations/dbright"
+     user_name               = "dbright"
      user_key                = "${file(".chef/user.pem")}"
-     version                 = "${var.chef_versions["client"]}"
+     version                 = "15.4.45"
+     client_options          = ["chef_license 'accept'", "named_run_list 'web'"]
      fetch_chef_certificates = true
      recreate_client         = true
   }
+
+  provisioner "habitat" {
+    peers              = [self.private_ip]
+    use_sudo           = true
+    service_type       = "systemd"
+    accept_license     = true
+    auto_update        = true
+    builder_auth_token = "${var.hab_token}"
+
+    service {
+      name        = "dbright/lin-effortless-audit"
+      topology    = "standalone"
+      user_toml   = file("files/lin-effortless-audit-user.toml")
+      channel     = "stable"
+      group       = "dev"
+      application = "Linux Effortless Baseline"
+      strategy    = "at-once"
+    }
+  }
+
   ami           = "${data.aws_ami.centos.id}"
   instance_type = "t2.small"
   associate_public_ip_address = true
   subnet_id = "${local.subnet_public_00}"
 
-  key_name = "${aws_key_pair.personal.id}"
+  key_name = local.personal-ssh
 
-  vpc_security_group_ids = ["${local.sg_admin}","${local.sg_internal}"]
+  vpc_security_group_ids = [local.sg_admin,local.sg_internal]
 
-  tags = "${merge(data.terraform_remote_state.static.default_tags, map(
-    "Name", "${local.prefix}centos-7-b-${count.index}",
-  ))}"
+  tags  = "${merge(local.tags, map(
+          "Name", "${local.prefix}web-${count.index}${local.suffix}",
+          ))}"
 }

@@ -1,8 +1,13 @@
-
-# Show the public IP address at the end
-output "windows-a-address" {
-  value = "${aws_instance.windows-a.*.public_ip}"
+output "windows-sql-login-data" {
+  value = {
+    for instance in aws_instance.windows-sql:
+    instance.public_ip => "${rsadecrypt(instance.password_data, file(var.ssh_key.file))}"
+  }
 }
-output "windows-b-address" {
-  value = "${aws_instance.windows-b.*.public_ip}"
+
+output "windows-frontend-login-data" {
+  value = {
+    for instance in aws_instance.windows-frontend:
+    instance.public_ip => "${rsadecrypt(instance.password_data, file(var.ssh_key.file))}"
+  }
 }

@@ -10,3 +10,4 @@ output "subnet_private_01" {
 output "subnet_public_00" {
   value = "${aws_subnet.public_00.id}"
 }
+

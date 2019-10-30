@@ -4,12 +4,6 @@ variable "dynamodb-name" {
   default          = "CHANGEME"
 }
 
-variable "dynamodb-suffix" {
-  type             = "string"
-  description      = "Ending for dynamodb db name, this should match the dir structure, but with - instead of /"
-  default          = "CHANGE-ME"
-}
-
 variable "tfstate-key" {
   type             = "string"
   description      = "keypath to the tfstate file in the s3 bucket, should match dir structure"
@@ -27,4 +21,9 @@ variable "networking" {
     private_00_cidr_block      = "10.12.23.32/28" #14 useable IPs
     private_01_cidr_block      = "10.12.23.48/28" #14 useable IPs
   }
+}
+variable "X-S3-Terraform-Path" {
+  type             = "string"
+  description      = "S3 Bucket + Path for this TFSTATE"
+  default          = "CHANGEME"
 }

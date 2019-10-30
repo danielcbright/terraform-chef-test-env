@@ -6,3 +6,6 @@
 !/.gitignore
 **/.delivery**
 **/.terraform
+**/*.tfvars
+**/\files\/**
+**/*.chef
